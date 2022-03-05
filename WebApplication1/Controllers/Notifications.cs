@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace WebApplication1.Controllers;
@@ -42,6 +43,34 @@ public class Notifications : Controller
         return Ok($"Topic {topicName} has been creeated");
     }
 
+    [HttpPost]
+    public async Task<IActionResult> AddMessageToTopic(string topicArn, string message)
+    {
+        try
+        {
+            var request = new PublishRequest
+            {
+                TopicArn = topicArn,
+                Message = message
+            };
+
+            await _client.PublishAsync(request);
+            return Ok($"Message was successfully added to topic {topicArn}");
+        }
+        catch (Exception e)
+        {
+            return BadRequest(e.Message);
+        }
+        
+    }
+
+    [HttpGet]
+    [Obsolete("please review before allowing it to be used")]
+    public async Task<IActionResult> SubscribeMessages(string topicArn)
+    {
+        return Ok("Nothing to see here");
+    }
+    
     [HttpDelete]
     public async Task<IActionResult> RemoveTopic(string topicArn)
     {
