@@ -12,12 +12,12 @@ namespace WebApplication1.Controllers;
 public class Notifications : Controller
 {
     private readonly AmazonSimpleNotificationServiceClient _client;
-
-    public Notifications()
+    
+    public Notifications(IConfiguration configuration)
     {
         _client = new AmazonSimpleNotificationServiceClient(new AmazonSimpleNotificationServiceConfig
         {
-            ServiceURL = "http://localhost:4566"
+            ServiceURL = configuration["awsServer"]
         });
     }
 

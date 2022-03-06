@@ -12,12 +12,12 @@ namespace WebApplication1.Controllers;
 public class Kinesis : Controller
 {
     private readonly AmazonKinesisClient _client;
-
-    public Kinesis()
+    
+    public Kinesis(IConfiguration configuration)
     {
         _client = new AmazonKinesisClient(new AmazonKinesisConfig
         {
-            ServiceURL = "http://localhost:4566"
+            ServiceURL = configuration["awsServer"]
         });
     }
 

@@ -16,11 +16,11 @@ public class QueueMessages : Controller
     
     private readonly AmazonSQSClient _client;
 
-    public QueueMessages()
+    public QueueMessages(IConfiguration configuration)
     {
         _client = new AmazonSQSClient(new AmazonSQSConfig
         {
-            ServiceURL = "http://localhost:4566"
+            ServiceURL = configuration["awsServer"]
         });
     }
 

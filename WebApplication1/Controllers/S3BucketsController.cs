@@ -13,12 +13,12 @@ public class S3Buckets : Controller
 {
     private readonly AmazonS3Client _client;
 
-    public S3Buckets()
+    public S3Buckets(IConfiguration configuration)
     {
         _client = new AmazonS3Client(
             new AmazonS3Config()
             {
-                ServiceURL = "http://localhost:4566",
+                ServiceURL = configuration["awsServer"],
                 ForcePathStyle = true
             });
     }
