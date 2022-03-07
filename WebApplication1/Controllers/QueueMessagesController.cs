@@ -1,9 +1,7 @@
-using System.Net;
 using System.Text.Json;
 using Amazon.SQS;
-using Amazon.SQS.Model;
 using Microsoft.AspNetCore.Mvc;
-using WebApplication1.Models;
+using WebApplication1.Interfaces;
 
 namespace WebApplication1.Controllers;
 
@@ -14,28 +12,18 @@ public class QueueMessages : Controller
     //Todo: Add Deadletter queue example
     //Todo: refactor exception types
     
-    private readonly AmazonSQSClient _client;
-
-    public QueueMessages(IConfiguration configuration)
-    {
-        _client = new AmazonSQSClient(new AmazonSQSConfig
-        {
-            ServiceURL = configuration["awsServer"]
-        });
-    }
+    private readonly ISQSService _sqsService;
+    
+    public QueueMessages(ISQSService sqsService) => _sqsService = sqsService;
 
     [HttpPost]
     public async Task<IActionResult> CreateQueueRequest(string queueName)
     {
         try
         {
-            var queueRequest = new CreateQueueRequest()
-            {
-                QueueName = queueName,
-            };
-
-            var response = await _client.CreateQueueAsync(queueRequest);
-            return Ok($"Queue {queueName} has been created");
+            //TODO: Adding defense in case queue already exists
+            var response = await _sqsService.CreateQueue(queueName);
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -46,15 +34,7 @@ public class QueueMessages : Controller
     [HttpGet]
     public async Task<IActionResult> GetQueues()
     {
-        var response = new List<QueueDetails>();
-        
-        var queueRequest = await _client.ListQueuesAsync(new ListQueuesRequest());
-        foreach (var queueURL in queueRequest.QueueUrls)
-        {
-            GetQueueAttributesResponse attributesResponse = await _client.GetQueueAttributesAsync(new GetQueueAttributesRequest(queueURL, new List<string> { "All" }));
-            response.Add(new QueueDetails() {QueueUrl = queueURL, Messages = attributesResponse.ApproximateNumberOfMessages});
-        }
-
+        var response = await _sqsService.GetQueues();
         var json = JsonSerializer.Serialize(response);
         return Ok(json);
     }
@@ -62,19 +42,10 @@ public class QueueMessages : Controller
     [HttpPost]
     public async Task<IActionResult> PostMessage(string queueName, string message)
     {
-        var queueUrl = await GetQueueUrl(queueName);
-
         try
         {
-            var sendMessageRequest = new SendMessageRequest
-            {
-                QueueUrl = queueUrl,
-                MessageBody = JsonSerializer.Serialize(message)
-                // MessageAttributes = SqsMessageTypeAttribute.CreateAttribute<T>()
-            };
-
-            await _client.SendMessageAsync(sendMessageRequest);
-            return Ok($"Message has been sent");
+            var response = await _sqsService.PostMessage(queueName, message);
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -87,22 +58,8 @@ public class QueueMessages : Controller
     {
         try
         {
-            var queueUrl = await GetQueueUrl(queueName);
-            var response = await _client.ReceiveMessageAsync(new ReceiveMessageRequest
-            {
-                QueueUrl = queueUrl,
-                WaitTimeSeconds = 15,
-                AttributeNames = new List<string> {"ApproximateRecieveCount"},
-                MessageAttributeNames = new List<string> { "All"} 
-            });
-
-            if (response.HttpStatusCode == HttpStatusCode.OK)
-            {
-                var output = JsonSerializer.Serialize(response.Messages);
-                return Ok(output);
-            }
-
-            return Ok("No messages to be returned");
+            var response = await _sqsService.GetMessage(queueName);
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -115,18 +72,8 @@ public class QueueMessages : Controller
     {
         try
         {
-            var queueUrl = await GetQueueUrl(queueName);
-            var response = await _client.DeleteMessageAsync(new DeleteMessageRequest
-            {
-                QueueUrl = queueUrl,
-                ReceiptHandle = messageHandle
-            });
-
-            if (response.HttpStatusCode != HttpStatusCode.OK)
-                return BadRequest(
-                    $"Failed to DeleteMessageAsync with for [{messageHandle}] from queue '{queueName}'. Response: {response.HttpStatusCode}");
-
-            return Ok($"Message has been deleted from {queueName}");
+            var response = await _sqsService.RemoveMessage(queueName, messageHandle);
+            return Ok(response);
         }
         catch (Exception e)
         {
@@ -139,30 +86,12 @@ public class QueueMessages : Controller
     {
         try
         {
-            var queueUrl = await GetQueueUrl(queueName);
-            var response = await _client.DeleteQueueAsync(new DeleteQueueRequest
-            {
-                QueueUrl = queueUrl
-            });
-
-            if (response.HttpStatusCode != HttpStatusCode.OK)
-                return BadRequest($"Unable to remove Queue {queueName}");
-            
-            return Ok($"Queue {queueName} has been removed");
+            var response = await _sqsService.DeleteQueue(queueName);
+            return Ok(response);
         }
         catch (Exception e)
         {
             return BadRequest(e.Message);
         }
-    }
-    
-    private async Task<string> GetQueueUrl(string queue)
-    {
-        var request = new GetQueueUrlRequest(queue);
-        var response = await _client.GetQueueUrlAsync(request);
-        if (response.HttpStatusCode != HttpStatusCode.OK)
-            return String.Empty;
-
-        return response.QueueUrl;
     }
 }
