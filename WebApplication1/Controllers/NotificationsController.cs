@@ -1,9 +1,11 @@
 using System.Net;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text.Json;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using WebApplication1.Interfaces;
 
 namespace WebApplication1.Controllers;
 
@@ -12,9 +14,10 @@ namespace WebApplication1.Controllers;
 public class Notifications : Controller
 {
     private readonly AmazonSimpleNotificationServiceClient _client;
-    
-    public Notifications(IConfiguration configuration)
+    private readonly INotifications _notifications;
+    public Notifications(IConfiguration configuration, INotifications notifications)
     {
+        _notifications = notifications;
         _client = new AmazonSimpleNotificationServiceClient(new AmazonSimpleNotificationServiceConfig
         {
             ServiceURL = configuration["awsServer"]
@@ -24,22 +27,17 @@ public class Notifications : Controller
     [HttpGet]
     public async Task<IActionResult> GetTopics()
     {
-        var response = await _client.ListTopicsAsync(new ListTopicsRequest());
-        var output = response.Topics.Select(p => p.TopicArn);
-        return Ok(JsonSerializer.Serialize(output));
+        var response = await _notifications.GetTopics();
+        return Ok(JsonSerializer.Serialize(response));
     }
 
     [HttpPost]
     public async Task<IActionResult> CreateTopic(string topicName)
     {
-        var response  = await _client.CreateTopicAsync(new CreateTopicRequest
-        {
-            Name = topicName
-        });
-
-        if (response.HttpStatusCode != HttpStatusCode.OK)
+        var response = await _notifications.CreateTopic(topicName);
+        if (response != HttpStatusCode.OK)
             return BadRequest($"Unable to create topic {topicName}");
-
+        
         return Ok($"Topic {topicName} has been creeated");
     }
 
@@ -48,20 +46,16 @@ public class Notifications : Controller
     {
         try
         {
-            var request = new PublishRequest
-            {
-                TopicArn = topicArn,
-                Message = message
-            };
-
-            await _client.PublishAsync(request);
+            var response = await _notifications.AddMessageToTopic(topicArn, message);
+            if (!response)
+                return Ok($"Message was not added to topic {topicArn}");
+            
             return Ok($"Message was successfully added to topic {topicArn}");
         }
         catch (Exception e)
         {
             return BadRequest(e.Message);
         }
-        
     }
 
     [HttpGet]
@@ -74,10 +68,7 @@ public class Notifications : Controller
     [HttpDelete]
     public async Task<IActionResult> RemoveTopic(string topicArn)
     {
-        var response = await _client.DeleteTopicAsync(new DeleteTopicRequest
-        {
-            TopicArn = topicArn
-        });
+        var response = await _notifications.RemoveTopic(topicArn)
 
         if (response.HttpStatusCode != HttpStatusCode.OK)
             return BadRequest($"Unable to remove topic {topicArn}");
