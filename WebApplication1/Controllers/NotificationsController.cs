@@ -1,9 +1,6 @@
 using System.Net;
-using System.Runtime.InteropServices.ComTypes;
 using System.Text.Json;
 using Amazon.SimpleNotificationService;
-using Amazon.SimpleNotificationService.Model;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Interfaces;
 
@@ -13,15 +10,10 @@ namespace WebApplication1.Controllers;
 [Route("[Controller]/[Action]")]
 public class Notifications : Controller
 {
-    private readonly AmazonSimpleNotificationServiceClient _client;
     private readonly INotifications _notifications;
     public Notifications(IConfiguration configuration, INotifications notifications)
     {
         _notifications = notifications;
-        _client = new AmazonSimpleNotificationServiceClient(new AmazonSimpleNotificationServiceConfig
-        {
-            ServiceURL = configuration["awsServer"]
-        });
     }
 
     [HttpGet]
@@ -68,9 +60,9 @@ public class Notifications : Controller
     [HttpDelete]
     public async Task<IActionResult> RemoveTopic(string topicArn)
     {
-        var response = await _notifications.RemoveTopic(topicArn)
+        var response = await _notifications.RemoveTopic(topicArn);
 
-        if (response.HttpStatusCode != HttpStatusCode.OK)
+        if (response != HttpStatusCode.OK)
             return BadRequest($"Unable to remove topic {topicArn}");
 
         return Ok($"Topic {topicArn} has been removed");
